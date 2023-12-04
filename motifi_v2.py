@@ -247,6 +247,31 @@ def Count2Node3Edge(u, v, delta, counts):
     
     counter.count(in_out, timestamps, delta, counts)
 
+def Count2Node3Edge_main(delta, counts, edges):
+    undir_edges = []
+    static = []
+    for edge in edges:
+        src, dst = [x for x in edge[0]]
+        static.append((src, dst))
+
+    for edge in static:
+        src, dst = [x for x in edge]
+
+        if src < dst  or (dst < src and (dst, src) not in static):
+            if (src, dst) not in undir_edges:
+                undir_edges.append((src, dst))
+            
+    for undir_edge in undir_edges:
+        src, dst = [x for x in undir_edge]
+        local = Counter3D()
+        Count2Node3Edge(src, dst, 300, local)
+        counts.data[0, 0] += local.data[0, 1, 0] + local.data[1, 0, 1]
+        counts.data[0, 1] += local.data[1, 0, 0] + local.data[0, 1, 1]
+        counts.data[1, 0] += local.data[0, 0, 0] + local.data[1, 1, 1]
+        counts.data[1, 1] += local.data[0, 0, 1] + local.data[1, 1, 0]
+
+#def countTriangles(delta, counts):
+
 
 def countStars(delta, pre_counts, pos_counts, mid_counts, edges):
     centers = getNodes(edges)
@@ -303,6 +328,13 @@ def motifCounter(delta, counts, edges):
     #counts = Counter2D(6,6)
 
     # count 2 Nodes 3 Edegs
+    edge_counts = Counter2D(2, 2)
+    Count2Node3Edge_main(delta, edge_counts, edges)
+    counts.data[4, 0] = edge_counts.data[0, 0]
+    counts.data[4, 1] = edge_counts.data[0, 1]
+    counts.data[5, 0] = edge_counts.data[1, 0]
+    counts.data[5, 1] = edge_counts.data[1, 1]
+
 
     # count Stars
     pre_counts = Counter3D(2, 2, 2)
@@ -349,7 +381,7 @@ def motifCounter(delta, counts, edges):
 
 
 def getEdges(edges):
-    with open("graph1.txt") as file:
+    with open("example-temporal-graph.txt") as file:
         for line in file:
             u, v, t = [int(x) for x in line.rstrip().split(' ')]
             edges.append(((u,v),t))
@@ -363,7 +395,7 @@ if __name__ == "__main__":
     #print(getNodes(edges))
     #print(getNeighbors(edges, 0))
     counts = Counter2D(6, 6)
-    delta = 10
+    delta = 300
     motifCounter(delta, counts, edges)
     print(counts.data)
 
