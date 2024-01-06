@@ -21,6 +21,14 @@ class Index:
     def up(self):
         self.value += 1
 
+# Triad edge data consists of a neighbor, a direction, and an indicator of whether
+# the edge connects with wich endpoint (u or v).
+class TriadEdgeData:
+    def __init__(self, nbr, direction, u_or_v):
+        self.nbr = nbr
+        self.direction = direction
+        self.u_or_v = u_or_v
+
 # consists of a neighbor and direction
 class StarEdgeData:
     def __init__(self, nbr, direction):
@@ -124,6 +132,115 @@ class StarCounter:
                 self.processCurrent(events[i])
                 self.pushPre(events[i])
 
+class ThreeTEdgeTriadCounter:
+    def __init__(self, max_nodes, node_u, node_v):
+        self.max_nodes = max_nodes
+        self.node_u = node_u
+        self.node_v = node_v
+        self.pre_sum = None
+        self.pos_sum = None
+        self.mid_sum = None
+        self.triad_counts = None
+        self.pre_nodes = None
+        self.pos_nodes = None
+
+    def counts(self, dir1, dir2, dir3):
+        return self.triad_counts.data[dir1, dir2, dir3]
+
+    def initializeCounters(self):
+        self.pre_sum = Counter3D(2,2,2)
+        self.pos_sum = Counter3D(2,2,2)
+        self.mid_sum = Counter3D(2,2,2)
+        self.triad_counts = Counter3D(2,2,2)
+        self.pre_nodes = Counter3D(2,2, self.max_nodes)
+        self.pos_nodes = Counter3D(2,2, self.max_nodes)
+
+    def popPre(self, event: TriadEdgeData):
+        nbr = event.nbr
+        direction = event.dir
+        u_or_v = event.u_or_v
+        if not self.isEdgeNode(nbr):
+            self.pre_nodes.data[direction, u_or_v, nbr] -= 1
+            for i in range(2):
+                self.pre_sum.data[u_or_v, direction, i] -= self.pre_nodes.data[i, 1 - u_or_v, nbr]
+
+    def popPos(self, event: TriadEdgeData):
+        nbr = event.nbr
+        direction = event.direction
+        u_or_v = event.u_or_v
+        if not self.isEdgeNode(nbr):
+            self.pos_nodes.data[direction, u_or_v, nbr] -= 1
+            for i in range(2):
+                self.pos_sum.data[u_or_v, direction, i] -= self.pos_nodes.data[i, 1 - u_or_v, nbr]
+
+    def pushPre(self, event: TriadEdgeData):
+        nbr = event.nbr
+        direction = event.direction
+        u_or_v = event.u_or_v
+        if not self.isEdgeNode(nbr):
+            for i in range(2):
+                self.pre_sum.data[1 - u_or_v, i, direction] += self.pre_nodes.data[i, 1 - u_or_v, nbr]
+            self.pre_nodes.data[direction, u_or_v, nbr] += 1
+
+    def pushPos(self, event: TriadEdgeData):
+        nbr = event.nbr
+        direction = event.direction
+        u_or_v = event.u_or_v
+        if not self.isEdgeNode(nbr):
+            for i in range(2):
+                self.pos_sum.data[1 - u_or_v, i, direction] += self.pos_nodes.data[i, 1 - u_or_v, nbr]
+            self.pos_nodes.data[direction, u_or_v, nbr] += 1
+
+    def processCurrent(self, event: TriadEdgeData):
+        nbr = event.nbr
+        direction = event.direction
+        u_or_v = event.u_or_v
+        if not self.isEdgeNode(nbr):
+            for i in range(2):
+                self.mid_sum.data[1 - u_or_v, i, direction] -= self.pre_nodes.data[i, 1 - u_or_v, nbr]
+                self.mid_sum.data[u_or_v, direction, i] += self.pos_nodes.data[i, 1 - u_or_v, nbr]
+
+        if self.isEdgeNode(nbr):
+            u_to_v = 0
+            if(nbr == self.node_u and direction == 0) or (nbr == self.node_v and direction == 1):
+                u_to_v = 1
+
+            self.triad_counts.data[0, 0, 0] += self.mid_sum.data[u_to_v, 0, 0] + self.pos_sum.data[u_to_v, 0, 1] + self.pre_sum.data[1- u_to_v, 1, 1]
+            self.triad_counts.data[1, 0, 0] += self.mid_sum.data[u_to_v, 1, 0] + self.pos_sum.data[1 - u_to_v, 0, 1] + self.pre_sum.data[1 - u_to_v, 0, 1]
+            self.triad_counts.data[0, 1, 0] += self.mid_sum.data[1 - u_to_v, 0, 0] + self.pos_sum.data[u_to_v, 1, 1] + self.pre_sum.data[1 - u_to_v, 1, 0]
+            self.triad_counts.data[1, 1, 0] += self.mid_sum.data[1 - u_to_v, 1, 0] + self.pos_sum.data[1 - u_to_v, 1, 1] + self.pre_sum.data[1 - u_to_v, 0, 0]
+            self.triad_counts.data[0, 0, 1] += self.mid_sum.data[u_to_v, 0, 1] + self.pos_sum.data[u_to_v, 0, 0] + self.pre_sum.data[u_to_v, 1, 1]
+            self.triad_counts.data[1, 0, 1] += self.mid_sum.data[u_to_v, 1, 1] + self.pos_sum.data[1 - u_to_v, 0, 0] + self.pre_sum.data[u_to_v, 0, 1]
+            self.triad_counts.data[0, 1, 1] += self.mid_sum.data[1 - u_to_v, 0, 1] + self.pos_sum.data[u_to_v, 1, 0] + self.pre_sum.data[u_to_v, 1, 0]
+            self.triad_counts.data[1, 1, 1] += self.mid_sum.data[1 - u_to_v, 1, 1] + self.pos_sum.data[1 - u_to_v, 1, 0] + self.pre_sum.data[u_to_v, 0, 0]
+
+    def isEdgeNode(self, nbr):
+        return nbr == self.node_u or nbr == self.node_v
+
+    def count(self, events, timestapms, delta):
+        self.initializeCounters()
+        
+        if len(events) != len(timestapms):
+            print("Number of events must match number of timestamps") 
+        else:
+            start = 0
+            end = 0
+            L = len(timestapms)
+            for i in range(L):
+                tj = timestapms[i]
+                while start < L and timestapms[start] < (tj - delta):
+                    self.popPre(events[start])
+                    start += 1
+                
+                while end < L and timestapms[end] <= (tj + delta):
+                    self.pushPos(events[end])
+                    end += 1
+
+                self.popPos(events[i])
+                self.processCurrent(events[i])
+                self.pushPre(events[i])
+
+
 
 class ThreeEdgeMotifCounter:
     def __init__(self, size):
@@ -202,6 +319,25 @@ def getNeighbors(edges, center):
                 nbrs.append(nbr)
     return nbrs
 
+def AddTriadEdgeData(events, ts_inidces, index, u, v, nbr, key1, key2, edges):
+    timestamps = []
+
+    # zasebna funkcija ili klassa?
+    for edge in edges:
+        if (u,v) in edge:
+            timestamps.append(edge[1])
+    
+    j = 0
+    for i in range(len(timestamps)):
+        # zasto?
+        #j+=1
+        #### IPAK KORISTENO i!!!
+        ts_inidces.append((timestamps[i], index.value))
+        events.append(TriadEdgeData(nbr, key1, key2))
+        # ++index ili index++?
+        index.up()
+    #pass
+
 def AddStarEdgeData(ts_inidces, events, index, u, v, nbr, key, edges):
     ts_vec = []
 
@@ -270,7 +406,142 @@ def Count2Node3Edge_main(delta, counts, edges):
         counts.data[1, 0] += local.data[0, 0, 0] + local.data[1, 1, 1]
         counts.data[1, 1] += local.data[0, 0, 1] + local.data[1, 1, 0]
 
-#def countTriangles(delta, counts):
+def GetAllStaticTriangles(us, vs, ws, static, edges):
+    #max_nodes = max(max(x) for x in static)
+    max_nodes = len(static)
+    degrees = [(0, 0) for _ in range(max_nodes)]
+    #degrees = {}
+
+    nodes = getNodes(edges)
+    for node in nodes:
+        src = node
+        nbrs = getNeighbors(edges, src)
+        degrees[src] = (len(nbrs), src)
+        
+    #degrees = dict(sorted(degrees.items()))
+    degrees.sort()
+    #order = {}
+    order = [None] * max_nodes
+    
+    for i in range(max_nodes):
+        key, dat = degrees[i]
+        order[dat] = i
+    
+    for node in nodes:
+        src = node
+        src_pos = order[src]
+
+        nbrs = getNeighbors(edges, src)
+        neighbors_higher = []
+        for nbr in nbrs:
+            if order[nbr] > src_pos:
+                neighbors_higher.append(nbr)
+
+        for ind1 in range(len(neighbors_higher)):
+            for ind2 in range(ind1+1, len(neighbors_higher)):
+                dst1 = neighbors_higher[ind1]
+                dst2 = neighbors_higher[ind2]
+
+                if (dst1, dst2) in static or (dst2, dst1) in static:
+                    us.append(src)
+                    vs.append(dst1)
+                    ws.append(dst2)
+    
+
+def countTriangles(delta, counts, edges):
+    static = []
+    temporal_data = {}
+    for edge in edges:
+        src, dst = [x for x in edge[0]]
+        static.append((src, dst))
+        temporal_data.setdefault((src, dst), []).append(edge)
+
+    edge_counts = {}
+    assignments = {}
+    for edge in static:
+        src, dst = [x for x in edge]
+        min_node = min(src, dst)
+        max_node = max(src, dst)
+        #edge_counts[(min_node, max_node)] += len(temporal_data[(src, dst)])
+        edge_counts[(min_node, max_node)] = edge_counts.get((min_node, max_node), 0) + len(temporal_data.get((src, dst), []))
+        assignments[(min_node, max_node)] = []
+
+    us = [] 
+    vs = []
+    ws = []
+    GetAllStaticTriangles(us, vs, ws, static, edges)
+    for i in range(len(us)):
+        u = us[i]
+        v = vs[i]
+        w = ws[i]
+        counts_uv = edge_counts[(min(u,v), max(u, v))]
+        counts_uw = edge_counts[(min(u,w), max(u, w))]
+        counts_vw = edge_counts[(min(v,w), max(v, w))]
+
+        if counts_uv >= max(counts_uw, counts_vw):
+            assignments[(min(u,v), max(u, v))].append(w)
+        elif counts_uw >= max(counts_uv, counts_vw):
+            assignments[(min(u,w), max(u, w))].append(v)
+        elif counts_vw >= max(counts_uv, counts_uw):
+            assignments[(min(v, w), max(v, w))].append(u)
+
+    all_edges = []
+    all_nodes = getNodes(edges)
+    for node in all_nodes:
+        nbrs = getNeighbors(edges, node)
+        for nbr in nbrs:
+            if (node, nbr) in assignments and len(assignments[(node, nbr)]) > 0:
+                all_edges.append((node, nbr))
+
+    # Count triangles on edges with the assigned neighbors
+    for edge in all_edges:
+        u = edge[0] # Key
+        v = edge[1] # Data
+        # Continue if no assignment
+        if (u, v) not in assignments:
+            continue
+        uv_assignment = assignments[(u, v)]
+        # Continue if no data
+        if len(uv_assignment) == 0:
+            continue
+
+        # Get all events on (u, v)
+        events = []
+        ts_inidces = []
+        index = Index()
+        nbr_index = 0
+        # Assign indices from 0, 1, ..., num_nbrs + 2
+        AddTriadEdgeData(events, ts_inidces, index, u, v, nbr_index, 0, 1, edges)
+        nbr_index += 1
+        AddTriadEdgeData(events, ts_inidces, index, v, u, nbr_index, 0, 0, edges)
+        nbr_index += 1
+
+        # Get all events on triangles assigned to (u, v)
+        for w in uv_assignment:
+            AddTriadEdgeData(events, ts_inidces, index, w, u, nbr_index, 0, 0, edges)
+            AddTriadEdgeData(events, ts_inidces, index, w, v, nbr_index, 0, 1, edges)
+            AddTriadEdgeData(events, ts_inidces, index, u, w, nbr_index, 1, 0, edges)
+            AddTriadEdgeData(events, ts_inidces, index, v, w, nbr_index, 1, 1, edges)
+            nbr_index+=1
+
+        # Put events in sorted order
+        ts_inidces.sort()
+        timestamps = []
+        sorted_events = []
+        for ts in ts_inidces:
+            timestamps.append(ts[0])
+            sorted_events.append(events[ts[1]])
+
+        # Get the counts and update the counter
+        tetc = ThreeTEdgeTriadCounter(nbr_index, 0, 1)
+        tetc.count(sorted_events, timestamps, delta)
+        for dir1 in range(2):
+            for dir2 in range(2):
+                for dir3 in range(2):
+                    counts.data[dir1, dir2, dir3] += tetc.counts(dir1, dir2, dir3)
+
+
+        
 
 
 def countStars(delta, pre_counts, pos_counts, mid_counts, edges):
@@ -373,8 +644,17 @@ def motifCounter(delta, counts, edges):
     counts.data[5, 5] = pre_counts.data[1, 1, 1]
 
     # count Triangles
+    triad_counts = Counter3D(2, 2, 2)
+    countTriangles(delta, triad_counts, edges)
+    counts.data[0, 2] = triad_counts.data[0, 0, 0]
+    counts.data[0, 3] = triad_counts.data[0, 0, 1]
+    counts.data[1, 2] = triad_counts.data[0, 1, 0]
+    counts.data[1, 3] = triad_counts.data[0, 1, 1]
+    counts.data[2, 4] = triad_counts.data[1, 0, 0]
+    counts.data[2, 5] = triad_counts.data[1, 0, 1]
+    counts.data[3, 4] = triad_counts.data[1, 1, 0]
+    counts.data[3, 5] = triad_counts.data[1, 1, 1]
 
-    pass
 
 
 
