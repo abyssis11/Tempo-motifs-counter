@@ -1,5 +1,6 @@
 import numpy as np
 import copy
+import time
 
 class Counter1D:
     def __init__(self, n=0):
@@ -157,7 +158,7 @@ class ThreeTEdgeTriadCounter:
 
     def popPre(self, event: TriadEdgeData):
         nbr = event.nbr
-        direction = event.dir
+        direction = event.direction
         u_or_v = event.u_or_v
         if not self.isEdgeNode(nbr):
             self.pre_nodes.data[direction, u_or_v, nbr] -= 1
@@ -400,7 +401,7 @@ def Count2Node3Edge_main(delta, counts, edges):
     for undir_edge in undir_edges:
         src, dst = [x for x in undir_edge]
         local = Counter3D()
-        Count2Node3Edge(src, dst, 300, local)
+        Count2Node3Edge(src, dst, delta, local)
         counts.data[0, 0] += local.data[0, 1, 0] + local.data[1, 0, 1]
         counts.data[0, 1] += local.data[1, 0, 0] + local.data[0, 1, 1]
         counts.data[1, 0] += local.data[0, 0, 0] + local.data[1, 1, 1]
@@ -420,13 +421,15 @@ def GetAllStaticTriangles(us, vs, ws, static, edges):
         
     #degrees = dict(sorted(degrees.items()))
     degrees.sort()
+    #print(degrees)
     #order = {}
     order = [None] * max_nodes
     
     for i in range(max_nodes):
         key, dat = degrees[i]
         order[dat] = i
-    
+
+    #print(order)
     for node in nodes:
         src = node
         src_pos = order[src]
@@ -446,7 +449,11 @@ def GetAllStaticTriangles(us, vs, ws, static, edges):
                     us.append(src)
                     vs.append(dst1)
                     ws.append(dst2)
-    
+
+    #print(us)
+    #print(vs)
+    #print(ws)
+
 
 def countTriangles(delta, counts, edges):
     static = []
@@ -655,11 +662,6 @@ def motifCounter(delta, counts, edges):
     counts.data[3, 4] = triad_counts.data[1, 1, 0]
     counts.data[3, 5] = triad_counts.data[1, 1, 1]
 
-
-
-
-
-
 def getEdges(edges):
     with open("example-temporal-graph.txt") as file:
         for line in file:
@@ -668,6 +670,7 @@ def getEdges(edges):
 
 
 if __name__ == "__main__":
+    start = time.time ()
     edges = []
     getEdges(edges)
     #staticgraph
@@ -678,6 +681,8 @@ if __name__ == "__main__":
     delta = 300
     motifCounter(delta, counts, edges)
     print(counts.data)
+    end = time.time()
+    print("Time to complete: ", end - start)
 
     #c = Counter1D(5)
     #print(c.data)

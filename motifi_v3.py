@@ -2,6 +2,7 @@ import numpy as np
 import copy
 from multiprocessing import Process, Manager, Lock
 from multiprocessing.managers import BaseManager
+import time
 
 class Counter1D:
     def __init__(self, n=0):
@@ -191,7 +192,7 @@ class ThreeTEdgeTriadCounter:
 
     def popPre(self, event: TriadEdgeData):
         nbr = event.nbr
-        direction = event.dir
+        direction = event.direction
         u_or_v = event.u_or_v
         if not self.isEdgeNode(nbr):
             self.pre_nodes.data[direction, u_or_v, nbr] -= 1
@@ -456,11 +457,36 @@ def process_nodes(subset_nodes, edges, degrees, lock):
             degrees.insert(src, (len(nbrs), src))
             degrees.pop(src + 1)   
 
-def process_order(start, end, degrees, order):
+def process_order(start, end, degrees, order, lock):
     for i in range(start, end):
         key, dat = degrees[i]
-        order[dat] = i
-    print(order)
+        with lock:
+            order.insert(dat, i)
+            order.pop(dat + 1)   
+            #order[dat] = i
+
+def process_triangles_centered(subset_nodes, us, vs, ws, order, static, edges, lock):
+    for node in subset_nodes:
+        src = node
+        src_pos = order[src]
+
+        nbrs = getNeighbors(edges, src)
+        neighbors_higher = []
+        for nbr in nbrs:
+            if order[nbr] > src_pos:
+                neighbors_higher.append(nbr)
+
+        for ind1 in range(len(neighbors_higher)):
+            for ind2 in range(ind1+1, len(neighbors_higher)):
+                dst1 = neighbors_higher[ind1]
+                dst2 = neighbors_higher[ind2]
+
+                if (dst1, dst2) in static or (dst2, dst1) in static:
+                    with lock:
+                        us.append(src)
+                        vs.append(dst1)
+                        ws.append(dst2)
+
 
 def GetAllStaticTriangles(us, vs, ws, static, edges):
     #max_nodes = max(max(x) for x in static)
@@ -498,12 +524,71 @@ def GetAllStaticTriangles(us, vs, ws, static, edges):
 
     #degrees = dict(sorted(degrees.items()))
     degrees.sort()
+    #print(degrees)
     #order = {}
     order = [None] * max_nodes
-    for i in range(max_nodes):
-        key, dat = degrees[i]
-        order[dat] = i
+
+    with MyManager() as manager:
+        shared_order = manager.list()
+        for el in order:
+            shared_order.append(el)
         
+        lock = Lock()
+
+        num_processes = 4  # Or any number of processes you want
+        chunk_size = max_nodes // num_processes
+        processes = []
+
+        for i in range(num_processes):
+            start_index = i * chunk_size
+            end_index = start_index + chunk_size if i < num_processes - 1 else max_nodes
+            p = Process(target=process_order, args=(start_index, end_index, degrees, shared_order, lock))
+            processes.append(p)
+            p.start()
+
+        # Wait for all processes to finish
+        for p in processes:
+            p.join()
+        
+        # Copy data back to original counters
+        order = copy.deepcopy(shared_order)
+        
+    with MyManager() as manager:
+        shared_us = manager.list()
+        for el in us:
+            shared_us.append(el)
+        shared_vs = manager.list()
+        for el in vs:
+            shared_vs.append(el)
+        shared_ws = manager.list()
+        for el in ws:
+            shared_ws.append(el)
+        
+        lock = Lock()
+
+        num_processes = 4  # Or any number of processes you want
+        chunk_size = len(nodes) // num_processes
+        processes = []
+
+        for i in range(num_processes):
+            start_index = i * chunk_size
+            end_index = start_index + chunk_size if i < num_processes - 1 else len(nodes)
+            p = Process(target=process_triangles_centered, args=(nodes[start_index:end_index], shared_us, shared_vs, shared_ws, order, static, edges, lock))
+            processes.append(p)
+            p.start()
+
+        # Wait for all processes to finish
+        for p in processes:
+            p.join()
+        
+        # Copy data back to original counters
+        us = copy.deepcopy(shared_us)
+        vs = copy.deepcopy(shared_vs)
+        ws = copy.deepcopy(shared_ws)
+    
+        return us, vs, ws
+    '''   
+    #print(order)
     for node in nodes:
         src = node
         src_pos = order[src]
@@ -523,6 +608,8 @@ def GetAllStaticTriangles(us, vs, ws, static, edges):
                     us.append(src)
                     vs.append(dst1)
                     ws.append(dst2)
+    '''
+    #print(ws)
 
 def process_uv_vs_ws(us, vs, ws, edge_counts, assignments, lock):
     for i in range(len(us)):
@@ -621,7 +708,10 @@ def countTriangles(delta, counts, edges):
     us = [] 
     vs = []
     ws = []
-    GetAllStaticTriangles(us, vs, ws, static, edges)
+    us, vs, ws = GetAllStaticTriangles(us, vs, ws, static, edges)
+    #print(us)
+    #print(vs)
+    #print(ws)
 
     with MyManager() as manager:
         # Create shared counters and lock
@@ -825,13 +915,14 @@ def motifCounter(delta, counts, edges):
     counts.data[3, 5] = triad_counts.data[1, 1, 1]
 
 def getEdges(edges):
-    with open("example-temporal-graph.txt") as file:
+    with open("email-Eu-core-temporal-Dept1.txt") as file:
         for line in file:
             u, v, t = [int(x) for x in line.rstrip().split(' ')]
             edges.append(((u,v),t))
 
 
 if __name__ == "__main__":
+    start = time.time ()
     edges = []
     getEdges(edges)
     #staticgraph
@@ -839,9 +930,11 @@ if __name__ == "__main__":
     #print(getNodes(edges))
     #print(getNeighbors(edges, 0))
     counts = Counter2D(6, 6)
-    delta = 300
+    delta = 3600
     motifCounter(delta, counts, edges)
     print(counts.data)
+    end = time.time()
+    print("Time to complete: ", end - start)
 
     #c = Counter1D(5)
     #print(c.data)
