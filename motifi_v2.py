@@ -1,6 +1,8 @@
 import numpy as np
 import copy
 import time
+from read_csv import getEdges
+import argparse
 
 class Counter1D:
     def __init__(self, n=0):
@@ -662,27 +664,32 @@ def motifCounter(delta, counts, edges):
     counts.data[3, 4] = triad_counts.data[1, 1, 0]
     counts.data[3, 5] = triad_counts.data[1, 1, 1]
 
+
+'''
 def getEdges(edges):
-    with open("example-temporal-graph.txt") as file:
+    with open("email-Eu-core-temporal-Dept1.txt") as file:
         for line in file:
             u, v, t = [int(x) for x in line.rstrip().split(' ')]
             edges.append(((u,v),t))
-
+'''
 
 if __name__ == "__main__":
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description="Process file and delta.")
+    parser.add_argument("--file", type=str, required=True, help="Path to the CSV file")
+    parser.add_argument("--delta", type=int, required=True, help="Delta value")
+
+    # Parse arguments
+    args = parser.parse_args()
+
+    np.set_printoptions(formatter={'float': '{:0.0f}'.format})
     start = time.time ()
-    edges = []
-    getEdges(edges)
-    #staticgraph
-    #print(edges)
-    #print(getNodes(edges))
-    #print(getNeighbors(edges, 0))
+
+    edges = getEdges(args.file)
     counts = Counter2D(6, 6)
-    delta = 300
-    motifCounter(delta, counts, edges)
+    motifCounter(args.delta, counts, edges)
     print(counts.data)
+
     end = time.time()
     print("Time to complete: ", end - start)
 
-    #c = Counter1D(5)
-    #print(c.data)

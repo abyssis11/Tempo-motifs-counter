@@ -3,6 +3,7 @@ import copy
 from multiprocessing import Process, Manager, Lock
 from multiprocessing.managers import BaseManager
 import time
+from read_csv import getEdges
 
 class Counter1D:
     def __init__(self, n=0):
@@ -411,8 +412,8 @@ def Count2Node3Edge_main(delta, counts, edges):
     undir_edges = []
     static = []
     for edge in edges:
-        src, dst = [x for x in edge[0]]
-        static.append((src, dst))
+        #src, dst = [x for x in edge[0]]
+        static.append(edge[0])
 
     for edge in static:
         src, dst = [x for x in edge]
@@ -914,28 +915,19 @@ def motifCounter(delta, counts, edges):
     counts.data[3, 4] = triad_counts.data[1, 1, 0]
     counts.data[3, 5] = triad_counts.data[1, 1, 1]
 
-def getEdges(edges):
-    with open("email-Eu-core-temporal-Dept1.txt") as file:
-        for line in file:
-            u, v, t = [int(x) for x in line.rstrip().split(' ')]
-            edges.append(((u,v),t))
 
 
 if __name__ == "__main__":
     np.set_printoptions(formatter={'float': '{:0.0f}'.format})
     start = time.time ()
-    edges = []
-    getEdges(edges)
-    #staticgraph
-    #print(edges)
-    #print(getNodes(edges))
-    #print(getNeighbors(edges, 0))
+
+    file = "Cs_5DIZ_24_11_2023_10_22_A2.csv"
+    delta = 60
+
+    edges = getEdges(file)
     counts = Counter2D(6, 6)
-    delta = 3600
     motifCounter(delta, counts, edges)
     print(counts.data)
+
     end = time.time()
     print("Time to complete: ", end - start)
-
-    #c = Counter1D(5)
-    #print(c.data)
