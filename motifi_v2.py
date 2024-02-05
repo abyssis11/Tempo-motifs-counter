@@ -3,6 +3,10 @@ import copy
 import time
 from read_csv import getEdges
 import argparse
+import networkx as nx
+import matplotlib.pyplot as plt
+import seaborn as sns
+from PIL import Image 
 
 class Counter1D:
     def __init__(self, n=0):
@@ -686,10 +690,42 @@ if __name__ == "__main__":
     start = time.time ()
 
     edges = getEdges(args.file)
+    
     counts = Counter2D(6, 6)
     motifCounter(args.delta, counts, edges)
     print(counts.data)
 
     end = time.time()
+    
+    img = Image.open('.\Motif_background.png')
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 6))
+    
+    heatmap = sns.heatmap(counts.data, cmap="Greens", annot=True, fmt=".0f", cbar_kws={'label': 'Motif Intensity'}, ax=ax1)                      
+    heatmap.set_xlabel("Y")
+    heatmap.set_ylabel("X")
+    ax1.set_title('M XY')  # Set title
+
+    ax1.set_xticklabels([str(x + 1) for x in range(6)])
+    ax1.set_yticklabels([str(y + 1) for y in range(6)])
+    plt.title('Motif Heatmap')
+    xlim, ylim = ax1.get_xlim(), ax1.get_ylim()
+    #cax = plt.axes([1, 0.9, 0.8, 0.8])
+    ax2.imshow(img, extent=xlim + ylim, aspect='auto', alpha=0.5)
+    ax2.set_title('Motif Types')
+    
+    G = nx.DiGraph()
+    
+    for edge, timestamp in edges:
+        G.add_edge(edge[0], edge[1], timestamp=timestamp)
+        
+    pos = nx.spring_layout(G)
+    nx.draw(G, pos, with_labels=True, ax=ax3)
+    ax3.set_title("Network Graph")
+    #plt.show()
+
+    plt.tight_layout()
+    
+    plt.show()
+    
     print("Time to complete: ", end - start)
 
