@@ -19,12 +19,15 @@ def getEdges(file_path):
     df['node_1'] = df['node_1'].apply(transform_node_value)
     df['node_2'] = df['node_2'].apply(transform_node_value)
 
+    # Remove duplicate rows based on 'start_of_interaction'
+    #df = df.drop_duplicates(subset='start_of_interaction')
+
     # Create a list of tuples in the desired format
     tuples_list = [((int(row['node_1']), int(row['node_2'])), int(row['start_of_interaction'])) for _, row in df.iterrows()]
 
     file_path = file_path.replace('.csv', "")
     # Write the tuples to the output txt file
-    with open(file_path+"-TEXT.txt", 'w') as file:
+    with open(file_path+".txt", 'w') as file:
         for item in tuples_list:
             file.write(f"{item[0][0]} {item[0][1]} {item[1]}\n")
 

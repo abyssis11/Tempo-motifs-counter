@@ -3,6 +3,8 @@ import copy
 from multiprocessing import Process, Manager, Lock
 from multiprocessing.managers import BaseManager
 import time
+from read_csv import getEdges
+import argparse
 
 class Counter1D:
     def __init__(self, n=0):
@@ -637,7 +639,7 @@ def process_uv_vs_ws(us, vs, ws, edge_counts, assignments, lock):
                 assignment.append(u)
                 assignments.update({(min(v, w), max(v, w)): assignment})
 
-def process_all_edges(subset_all_edges, counts, assignments, edges, lock):
+def process_all_edges(subset_all_edges, counts, assignments, edges, lock, delta):
     # Count triangles on edges with the assigned neighbors
     for edge in subset_all_edges:
         u = edge[0] # Key
@@ -763,7 +765,7 @@ def countTriangles(delta, counts, edges):
         for i in range(num_processes):
             start_index = i * chunk_size
             end_index = start_index + chunk_size if i < num_processes - 1 else len(all_edges)
-            p = Process(target=process_all_edges, args=(all_edges[start_index:end_index], shared_counts, assignments, edges, lock))
+            p = Process(target=process_all_edges, args=(all_edges[start_index:end_index], shared_counts, assignments, edges, lock, delta))
             processes.append(p)
             p.start()
 
@@ -914,28 +916,30 @@ def motifCounter(delta, counts, edges):
     counts.data[3, 4] = triad_counts.data[1, 1, 0]
     counts.data[3, 5] = triad_counts.data[1, 1, 1]
 
+'''
 def getEdges(edges):
     with open("email-Eu-core-temporal-Dept1.txt") as file:
         for line in file:
             u, v, t = [int(x) for x in line.rstrip().split(' ')]
             edges.append(((u,v),t))
-
+'''
 
 if __name__ == "__main__":
+    # Set up argument parser
+    parser = argparse.ArgumentParser(description="Process file and delta.")
+    parser.add_argument("--file", type=str, required=True, help="Path to the CSV file")
+    parser.add_argument("--delta", type=int, required=True, help="Delta value")
+
+    # Parse arguments
+    args = parser.parse_args()
+
     np.set_printoptions(formatter={'float': '{:0.0f}'.format})
     start = time.time ()
-    edges = []
-    getEdges(edges)
-    #staticgraph
-    #print(edges)
-    #print(getNodes(edges))
-    #print(getNeighbors(edges, 0))
+
+    edges = getEdges(args.file)
     counts = Counter2D(6, 6)
-    delta = 3600
-    motifCounter(delta, counts, edges)
+    motifCounter(args.delta, counts, edges)
     print(counts.data)
+
     end = time.time()
     print("Time to complete: ", end - start)
-
-    #c = Counter1D(5)
-    #print(c.data)
