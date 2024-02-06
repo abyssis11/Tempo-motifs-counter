@@ -697,7 +697,7 @@ if __name__ == "__main__":
 
     end = time.time()
     
-    img = Image.open('.\Motif_background.png')
+    img = Image.open('Motif_background.png')
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 6))
     
     heatmap = sns.heatmap(counts.data, cmap="Greens", annot=True, fmt=".0f", cbar_kws={'label': 'Motif Intensity'}, ax=ax1)                      
@@ -725,6 +725,7 @@ if __name__ == "__main__":
 
     plt.tight_layout()
     
+    plt.savefig('plot.png')
     plt.show()
     
     print("Time to complete: ", end - start)
